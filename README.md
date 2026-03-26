@@ -20,6 +20,11 @@ Currently this will ask for the following:
 
 -p defines the use of custom rules with an option to use the default ruleset. it defaults to a folder named "rules" in the current working directory (.\rules). the directory needs to exist and toml files need to be present.
 
+It automatically adds 
+
+-s output to stdout
+-y use TAB separated output (makes it compatble with Snaffler Parser https://github.com/zh54321/SnafflerParser)
+
 It then gives a summary of the options selected with the command line it will use and gives the option to run or stop.
 
 <img width="743" height="245" alt="image" src="https://github.com/user-attachments/assets/1fcf84c2-ed81-492c-9ae3-6e6e4cb4d83c" />
