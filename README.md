@@ -10,7 +10,7 @@ Currently this will ask for the following:
 
 -n supply a comma separated list of targets. NOTE: currently the script exits if this is not supplied - **ISSUE #1**
 
--o the default output path relative to the current working directory. this will be created if it doesn't exist.The filename is a simple datetimestamp
+-o the default output path relative to the current working directory. this will be created if it doesn't exist.The filename is a simple datetimestamp (.\Output\202603261315.txt)
 
 -v verbosity level as per the snaffler git hub. default is 1 (Info)
 
@@ -18,7 +18,7 @@ Currently this will ask for the following:
 
 -i path to perform file discovery. NOTE this is not currently working because of a conflict with -n - **ISSUE #2**
 
--p defines the use of custom rules with an option to use the default ruleset. it defaults to a folder in the current workign directory. the directory needs to exist and toml files need to be present.
+-p defines the use of custom rules with an option to use the default ruleset. it defaults to a folder named "rules" in the current working directory (.\rules). the directory needs to exist and toml files need to be present.
 
 It then gives a summary of the options selected with the command line it will use and gives the option to run or stop.
 
