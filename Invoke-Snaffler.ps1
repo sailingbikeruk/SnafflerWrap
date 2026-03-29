@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Collects switch values from the user and launches Snaffler.exe.
-    Output filename is auto-generated in the format: yyyyMMdd-HHmm-<target>.log
+    Output filename is auto-generated in the format: yyyyMMddHHmmss.txt
 
 .EXAMPLE
     .\Invoke-Snaffler.ps1
@@ -77,7 +77,7 @@ Write-Banner
 # -- Working directory ----------------------------------------------------
 Write-Host "  Working directory : " -NoNewline -ForegroundColor DarkGray
 Write-Host (Get-Location) -ForegroundColor Cyan
-Write-Host "  Change directory? (press Enter to keep, or type a new path)" -ForegroundColor DarkGray
+Write-Host "  Enter the directory containing Snaffler.exe (press Enter to keep current)" -ForegroundColor DarkGray
 Write-Host "  Path    : " -ForegroundColor DarkGray -NoNewline
 $newDir = (Read-Host).Trim()
 if (-not [string]::IsNullOrWhiteSpace($newDir)) {
@@ -86,19 +86,109 @@ if (-not [string]::IsNullOrWhiteSpace($newDir)) {
 }
 Write-Host ""
 
-Write-Host "  -- Required ----------------------------------------------------" -ForegroundColor DarkGray
+# ---------------------------------------------
+#  Target / Scope selection
+# ---------------------------------------------
+
+Write-Host "  -- Target / Scope ----------------------------------------------" -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "  How would you like to specify targets?" -ForegroundColor White
+Write-Host ""
+Write-Host "      1 = Discover domain automatically   [-d]" -ForegroundColor DarkGray
+Write-Host "      2 = Comma-separated list of hosts   [-n]" -ForegroundColor DarkGray
+Write-Host "      3 = CSV file containing hosts       [-n]" -ForegroundColor DarkGray
+Write-Host "      4 = Local path (file discovery)     [-i]" -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "      Choice  : " -ForegroundColor DarkGray -NoNewline
+$targetMode = (Read-Host).Trim()
 Write-Host ""
 
-# -n  Target(s)
-$targets = Prompt-Value `
-    -Flag "-n" `
-    -Label "Target(s)" `
-    -Description "Comma-separated list of targets (hostnames, IPs, or CIDR ranges)" `
-    -Default ""
+# Variables populated by each branch
+$domainName   = ""
+$dcFqdn       = ""
+$hostList     = ""
+$localPath    = ""
 
-if ([string]::IsNullOrWhiteSpace($targets)) {
-    Write-Host "  [!] At least one target is required (-n). Exiting." -ForegroundColor Red
-    exit 1
+switch ($targetMode) {
+
+    # ---- 1: Domain discovery ------------------------------------------------
+    "1" {
+        Write-Host "  [-d]" -ForegroundColor Cyan -NoNewline
+        Write-Host " Domain name" -ForegroundColor White
+        Write-Host "      If you would like to specify the domain enter it here, if left blank Snaffler will attempt to enumerate for you" -ForegroundColor DarkGray
+        Write-Host "      Value   : " -ForegroundColor DarkGray -NoNewline
+        $domainName = (Read-Host).Trim()
+        Write-Host ""
+
+        Write-Host "  [-c]" -ForegroundColor Cyan -NoNewline
+        Write-Host " Domain Controller (optional)" -ForegroundColor White
+        Write-Host "      Enter the FQDN of a Domain Controller, or press Enter to skip" -ForegroundColor DarkGray
+        Write-Host "      Value   : " -ForegroundColor DarkGray -NoNewline
+        $dcFqdn = (Read-Host).Trim()
+        Write-Host ""
+    }
+
+    # ---- 2: Comma-separated host list ---------------------------------------
+    "2" {
+        Write-Host "  [-n]" -ForegroundColor Cyan -NoNewline
+        Write-Host " Host list" -ForegroundColor White
+        Write-Host "      Comma-separated hostnames, IPs, or CIDR ranges" -ForegroundColor DarkGray
+        Write-Host "      Value   : " -ForegroundColor DarkGray -NoNewline
+        $rawHosts = (Read-Host).Trim()
+        Write-Host ""
+
+        if ([string]::IsNullOrWhiteSpace($rawHosts)) {
+            Write-Host "  [!] At least one host is required. Exiting." -ForegroundColor Red
+            exit 1
+        }
+
+        # Strip all spaces from the comma-separated list
+        $hostList = ($rawHosts -replace '\s', '')
+    }
+
+    # ---- 3: CSV file of hosts -----------------------------------------------
+    "3" {
+        Write-Host "  [-n]" -ForegroundColor Cyan -NoNewline
+        Write-Host " CSV file path" -ForegroundColor White
+        Write-Host "      Path to a CSV file containing hostnames/IPs (one per line or comma-separated)" -ForegroundColor DarkGray
+        Write-Host "      Value   : " -ForegroundColor DarkGray -NoNewline
+        $csvPath = (Read-Host).Trim()
+        Write-Host ""
+
+        if ([string]::IsNullOrWhiteSpace($csvPath)) {
+            Write-Host "  [!] A file path is required. Exiting." -ForegroundColor Red
+            exit 1
+        }
+
+        if (-not (Test-Path $csvPath)) {
+            Write-Host "  [!] File not found: $csvPath. Exiting." -ForegroundColor Red
+            exit 1
+        }
+
+        $hostList = $csvPath
+        Write-Host "  [*] CSV file validated: $csvPath" -ForegroundColor Yellow
+        Write-Host ""
+    }
+
+    # ---- 4: Local path for file discovery -----------------------------------
+    "4" {
+        Write-Host "  [-i]" -ForegroundColor Cyan -NoNewline
+        Write-Host " Local discovery path" -ForegroundColor White
+        Write-Host "      Path on the local host to perform file discovery" -ForegroundColor DarkGray
+        Write-Host "      Value   : " -ForegroundColor DarkGray -NoNewline
+        $localPath = (Read-Host).Trim()
+        Write-Host ""
+
+        if ([string]::IsNullOrWhiteSpace($localPath)) {
+            Write-Host "  [!] A path is required for local file discovery. Exiting." -ForegroundColor Red
+            exit 1
+        }
+    }
+
+    default {
+        Write-Host "  [!] Invalid choice. Exiting." -ForegroundColor Red
+        exit 1
+    }
 }
 
 # ---------------------------------------------
@@ -142,13 +232,6 @@ $maxThreads = Prompt-Value `
     -Description "Number of concurrent scanning threads" `
     -Default $defaultMaxThreads
 
-# -i  File discovery path (optional)
-$filePath = Prompt-Value `
-    -Flag "-i" `
-    -Label "File discovery path (optional)" `
-    -Description "Path to perform file discovery. Leave blank to skip." `
-    -Default ""
-
 # -p  Custom ruleset path
 Write-Host "  [-p]" -ForegroundColor Cyan -NoNewline
 Write-Host " Custom ruleset path" -ForegroundColor White
@@ -184,7 +267,6 @@ if ($outputDir -and -not (Test-Path $outputDir)) {
 # ---------------------------------------------
 
 $argList = @(
-    "-n", $targets
     "-o", $outputFile
     "-v", $verbosity
     "-x", $maxThreads
@@ -192,8 +274,21 @@ $argList = @(
     "-y"
 )
 
-if (-not [string]::IsNullOrWhiteSpace($filePath)) {
-    $argList += "-i", $filePath
+switch ($targetMode) {
+    "1" {
+        if (-not [string]::IsNullOrWhiteSpace($domainName)) {
+            $argList += "-d", $domainName
+        }
+        if (-not [string]::IsNullOrWhiteSpace($dcFqdn)) {
+            $argList += "-c", $dcFqdn
+        }
+    }
+    { $_ -in "2","3" } {
+        $argList += "-n", $hostList
+    }
+    "4" {
+        $argList += "-i", $localPath
+    }
 }
 
 if (-not [string]::IsNullOrWhiteSpace($rulesPath)) {
@@ -207,13 +302,36 @@ if (-not [string]::IsNullOrWhiteSpace($rulesPath)) {
 Write-Host "  -- Launch Summary ----------------------------------------------" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "  Executable : " -NoNewline -ForegroundColor DarkGray; Write-Host $SnafflerPath -ForegroundColor White
-Write-Host "  Targets    : " -NoNewline -ForegroundColor DarkGray; Write-Host $targets      -ForegroundColor Green
+
+switch ($targetMode) {
+    "1" {
+        Write-Host "  Mode       : " -NoNewline -ForegroundColor DarkGray; Write-Host "Domain Discovery" -ForegroundColor Green
+        if (-not [string]::IsNullOrWhiteSpace($domainName)) {
+            Write-Host "  Domain     : " -NoNewline -ForegroundColor DarkGray; Write-Host $domainName -ForegroundColor Green
+        } else {
+            Write-Host "  Domain     : " -NoNewline -ForegroundColor DarkGray; Write-Host "(auto-enumerate)" -ForegroundColor DarkGreen
+        }
+        if (-not [string]::IsNullOrWhiteSpace($dcFqdn)) {
+            Write-Host "  DC (FQDN)  : " -NoNewline -ForegroundColor DarkGray; Write-Host $dcFqdn -ForegroundColor Green
+        }
+    }
+    "2" {
+        Write-Host "  Mode       : " -NoNewline -ForegroundColor DarkGray; Write-Host "Host List" -ForegroundColor Green
+        Write-Host "  Hosts      : " -NoNewline -ForegroundColor DarkGray; Write-Host $hostList -ForegroundColor Green
+    }
+    "3" {
+        Write-Host "  Mode       : " -NoNewline -ForegroundColor DarkGray; Write-Host "CSV File" -ForegroundColor Green
+        Write-Host "  Hosts      : " -NoNewline -ForegroundColor DarkGray; Write-Host $hostList -ForegroundColor Green
+    }
+    "4" {
+        Write-Host "  Mode       : " -NoNewline -ForegroundColor DarkGray; Write-Host "Local Path Discovery" -ForegroundColor Green
+        Write-Host "  Path       : " -NoNewline -ForegroundColor DarkGray; Write-Host $localPath -ForegroundColor Green
+    }
+}
+
 Write-Host "  Output     : " -NoNewline -ForegroundColor DarkGray; Write-Host $outputFile   -ForegroundColor Green
 Write-Host "  Verbosity  : " -NoNewline -ForegroundColor DarkGray; Write-Host $verbosity    -ForegroundColor White
 Write-Host "  Threads    : " -NoNewline -ForegroundColor DarkGray; Write-Host $maxThreads   -ForegroundColor White
-if (-not [string]::IsNullOrWhiteSpace($filePath)) {
-    Write-Host "  File Path  : " -NoNewline -ForegroundColor DarkGray; Write-Host $filePath  -ForegroundColor White
-}
 if (-not [string]::IsNullOrWhiteSpace($rulesPath)) {
     Write-Host "  Rules Path : " -NoNewline -ForegroundColor DarkGray; Write-Host $rulesPath -ForegroundColor White
 }
