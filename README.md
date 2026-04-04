@@ -23,7 +23,7 @@ Not all possible switches are currently included, if you want something, raise a
 
 <img width="846" height="269" alt="image" src="https://github.com/user-attachments/assets/5b31799a-2ea0-4b3d-a18c-b0ddf1a3dc64" /> <br />
 
--o the default output path relative to the current working directory. this will be created if it doesn't exist.The filename is a simple datetimestamp (.\Output\202603261315.txt)
+-o the default output path relative to the current working directory. this will be created if it doesn't exist. The filename includes a datetimestamp and the hostname of the machine the script is run on (e.g. `.\Output\20260404-1435-HOSTNAME.txt`)
 
 <img width="558" height="109" alt="image" src="https://github.com/user-attachments/assets/2363d35b-db61-40c2-8304-dcc11c929495" /> <br />
 
@@ -50,6 +50,8 @@ It then gives a summary of the options selected with the command line it will us
 
 <img width="821" height="251" alt="image" src="https://github.com/user-attachments/assets/107ff1e3-612c-411f-a0ab-5334e1ac578a" />
 
+---
 
+## About
 
-
+This project was written as a learning exercise for using [Claude Code](https://claude.ai/code).
