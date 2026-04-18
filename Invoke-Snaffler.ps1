@@ -391,19 +391,49 @@ if ($confirm -match '^[Nn]') {
 
 Write-Host ""
 Write-Host "  [*] Starting Snaffler..." -ForegroundColor Cyan
+Write-Host "  [*] Executable will be removed from disk on exit." -ForegroundColor DarkGray
 Write-Host ""
 
+$process = $null
+
 try {
-    & $SnafflerPath @argList
+    # Build a quoted argument string so paths with spaces are handled correctly
+    $argString = ($argList | ForEach-Object {
+        if ($_ -match '\s') { "`"$_`"" } else { $_ }
+    }) -join ' '
+
+    $process = Start-Process -FilePath $SnafflerPath -ArgumentList $argString -PassThru -NoNewWindow
+    Write-Host "  [*] Snaffler running  (PID: $($process.Id))" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  [+] Snaffler finished. Output saved to: $outputFile" -ForegroundColor Green
+
+    $process.WaitForExit()
+    $exitCode = $process.ExitCode
+
     Write-Host ""
-    Read-Host "  Press Enter to exit"
+    if ($exitCode -eq 0) {
+        Write-Host "  [+] Snaffler finished (exit code: $exitCode). Output saved to: $outputFile" -ForegroundColor Green
+    } else {
+        Write-Host "  [!] Snaffler exited with code: $exitCode" -ForegroundColor Yellow
+        Write-Host "      Output (if any) saved to: $outputFile" -ForegroundColor DarkGray
+    }
+    Write-Host ""
 }
 catch {
     Write-Host ""
     Write-Host "  [!] Failed to launch Snaffler: $_" -ForegroundColor Red
     Write-Host ""
-    Read-Host "  Press Enter to exit"
-    exit 1
 }
+finally {
+    # Remove executable from disk regardless of outcome
+    if (Test-Path $SnafflerPath) {
+        try {
+            Remove-Item -Path $SnafflerPath -Force -ErrorAction Stop
+            Write-Host "  [*] Removed executable: $SnafflerPath" -ForegroundColor DarkGray
+        }
+        catch {
+            Write-Host "  [!] Could not remove $SnafflerPath : $_" -ForegroundColor Yellow
+        }
+    }
+}
+
+Read-Host "  Press Enter to exit"
