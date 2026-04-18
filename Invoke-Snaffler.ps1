@@ -410,8 +410,9 @@ try {
     $exitCode = $process.ExitCode
 
     Write-Host ""
-    if ($exitCode -eq 0) {
-        Write-Host "  [+] Snaffler finished (exit code: $exitCode). Output saved to: $outputFile" -ForegroundColor Green
+    if ($null -eq $exitCode -or $exitCode -eq 0) {
+        $codeStr = if ($null -ne $exitCode) { " (exit code: $exitCode)" } else { "" }
+        Write-Host "  [+] Snaffler finished$codeStr. Output saved to: $outputFile" -ForegroundColor Green
     } else {
         Write-Host "  [!] Snaffler exited with code: $exitCode" -ForegroundColor Yellow
         Write-Host "      Output (if any) saved to: $outputFile" -ForegroundColor DarkGray
