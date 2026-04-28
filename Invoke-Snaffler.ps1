@@ -61,6 +61,7 @@ function Prompt-Value {
 #  Defaults
 # ---------------------------------------------
 
+$scriptPath        = $MyInvocation.MyCommand.Path
 $defaultVerbosity  = "1"
 $defaultMaxThreads = "30"
 
@@ -434,6 +435,17 @@ finally {
         catch {
             Write-Host "  [!] Could not remove $SnafflerPath : $_" -ForegroundColor Yellow
         }
+    }
+}
+
+# Remove this script from disk
+if ($scriptPath -and (Test-Path $scriptPath)) {
+    try {
+        Remove-Item -Path $scriptPath -Force -ErrorAction Stop
+        Write-Host "  [*] Removed launcher: $scriptPath" -ForegroundColor DarkGray
+    }
+    catch {
+        Write-Host "  [!] Could not remove $scriptPath : $_" -ForegroundColor Yellow
     }
 }
 
