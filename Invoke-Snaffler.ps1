@@ -426,14 +426,17 @@ catch {
     Write-Host ""
 }
 finally {
-    # Remove executable from disk regardless of outcome
-    if (Test-Path $SnafflerPath) {
-        try {
-            Remove-Item -Path $SnafflerPath -Force -ErrorAction Stop
-            Write-Host "  [*] Removed executable: $SnafflerPath" -ForegroundColor DarkGray
-        }
-        catch {
-            Write-Host "  [!] Could not remove $SnafflerPath : $_" -ForegroundColor Yellow
+    # Remove everything in the Snaffler directory except the Output folder
+    if (Test-Path $snafflerDir) {
+        $outputSubdir = Join-Path $snafflerDir "Output"
+        Get-ChildItem -Path $snafflerDir | Where-Object { $_.FullName -ne $outputSubdir } | ForEach-Object {
+            try {
+                Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction Stop
+                Write-Host "  [*] Removed: $($_.FullName)" -ForegroundColor DarkGray
+            }
+            catch {
+                Write-Host "  [!] Could not remove $($_.FullName) : $_" -ForegroundColor Yellow
+            }
         }
     }
 }
