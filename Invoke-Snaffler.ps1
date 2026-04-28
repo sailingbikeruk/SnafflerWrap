@@ -452,4 +452,40 @@ if ($scriptPath -and (Test-Path $scriptPath)) {
     }
 }
 
+# Remove PasswordAudit.zip — check desktop first, then search if not found
+$desktopZip = Join-Path ([Environment]::GetFolderPath('Desktop')) 'PasswordAudit.zip'
+
+$zipTargets = if (Test-Path $desktopZip) {
+    @($desktopZip)
+} else {
+    Write-Host "  [*] PasswordAudit.zip not on desktop, searching..." -ForegroundColor DarkGray
+    Get-ChildItem -Path $env:USERPROFILE -Filter 'PasswordAudit.zip' -Recurse -Force -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty FullName
+}
+
+if ($zipTargets) {
+    foreach ($zip in $zipTargets) {
+        try {
+            Remove-Item -Path $zip -Force -ErrorAction Stop
+            Write-Host "  [*] Removed: $zip" -ForegroundColor DarkGray
+        }
+        catch {
+            Write-Host "  [!] Could not remove $zip : $_" -ForegroundColor Yellow
+        }
+    }
+} else {
+    Write-Host "  [!] Warning: PasswordAudit.zip could not be found." -ForegroundColor Yellow
+}
+
+Write-Host ""
+Write-Host "  =================================================" -ForegroundColor DarkYellow
+Write-Host "  [!] REMINDER                                     " -ForegroundColor Yellow
+Write-Host "  =================================================" -ForegroundColor DarkYellow
+Write-Host ""
+Write-Host "  Before exiting, ensure the output files have been" -ForegroundColor White
+Write-Host "  copied from the server to SharePoint."            -ForegroundColor White
+Write-Host ""
+Write-Host "  =================================================" -ForegroundColor DarkYellow
+Write-Host ""
+
 Read-Host "  Press Enter to exit"
