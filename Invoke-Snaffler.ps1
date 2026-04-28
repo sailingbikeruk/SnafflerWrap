@@ -61,6 +61,7 @@ function Prompt-Value {
 #  Defaults
 # ---------------------------------------------
 
+$scriptPath        = $MyInvocation.MyCommand.Path
 $defaultVerbosity  = "1"
 $defaultMaxThreads = "30"
 
@@ -391,19 +392,100 @@ if ($confirm -match '^[Nn]') {
 
 Write-Host ""
 Write-Host "  [*] Starting Snaffler..." -ForegroundColor Cyan
+Write-Host "  [*] Executable will be removed from disk on exit." -ForegroundColor DarkGray
 Write-Host ""
 
+$process = $null
+
 try {
-    & $SnafflerPath @argList
+    # Build a quoted argument string so paths with spaces are handled correctly
+    $argString = ($argList | ForEach-Object {
+        if ($_ -match '\s') { "`"$_`"" } else { $_ }
+    }) -join ' '
+
+    $process = Start-Process -FilePath $SnafflerPath -ArgumentList $argString -PassThru -NoNewWindow
+    Write-Host "  [*] Snaffler running  (PID: $($process.Id))" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  [+] Snaffler finished. Output saved to: $outputFile" -ForegroundColor Green
+
+    $process.WaitForExit()
+    $exitCode = $process.ExitCode
+
     Write-Host ""
-    Read-Host "  Press Enter to exit"
+    if ($null -eq $exitCode -or $exitCode -eq 0) {
+        $codeStr = if ($null -ne $exitCode) { " (exit code: $exitCode)" } else { "" }
+        Write-Host "  [+] Snaffler finished$codeStr. Output saved to: $outputFile" -ForegroundColor Green
+    } else {
+        Write-Host "  [!] Snaffler exited with code: $exitCode" -ForegroundColor Yellow
+        Write-Host "      Output (if any) saved to: $outputFile" -ForegroundColor DarkGray
+    }
+    Write-Host ""
 }
 catch {
     Write-Host ""
     Write-Host "  [!] Failed to launch Snaffler: $_" -ForegroundColor Red
     Write-Host ""
-    Read-Host "  Press Enter to exit"
-    exit 1
 }
+finally {
+    # Remove everything in the Snaffler directory except the Output folder
+    if (Test-Path $snafflerDir) {
+        $outputSubdir = Join-Path $snafflerDir "Output"
+        Get-ChildItem -Path $snafflerDir | Where-Object { $_.FullName -ne $outputSubdir } | ForEach-Object {
+            try {
+                Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction Stop
+                Write-Host "  [*] Removed: $($_.FullName)" -ForegroundColor DarkGray
+            }
+            catch {
+                Write-Host "  [!] Could not remove $($_.FullName) : $_" -ForegroundColor Yellow
+            }
+        }
+    }
+}
+
+# Remove this script from disk
+if ($scriptPath -and (Test-Path $scriptPath)) {
+    try {
+        Remove-Item -Path $scriptPath -Force -ErrorAction Stop
+        Write-Host "  [*] Removed launcher: $scriptPath" -ForegroundColor DarkGray
+    }
+    catch {
+        Write-Host "  [!] Could not remove $scriptPath : $_" -ForegroundColor Yellow
+    }
+}
+
+# Remove PasswordAudit.zip — check desktop first, then search if not found
+$desktopZip = Join-Path ([Environment]::GetFolderPath('Desktop')) 'PasswordAudit.zip'
+
+$zipTargets = if (Test-Path $desktopZip) {
+    @($desktopZip)
+} else {
+    Write-Host "  [*] PasswordAudit.zip not on desktop, searching..." -ForegroundColor DarkGray
+    Get-ChildItem -Path $env:USERPROFILE -Filter 'PasswordAudit.zip' -Recurse -Force -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty FullName
+}
+
+if ($zipTargets) {
+    foreach ($zip in $zipTargets) {
+        try {
+            Remove-Item -Path $zip -Force -ErrorAction Stop
+            Write-Host "  [*] Removed: $zip" -ForegroundColor DarkGray
+        }
+        catch {
+            Write-Host "  [!] Could not remove $zip : $_" -ForegroundColor Yellow
+        }
+    }
+} else {
+    Write-Host "  [!] Warning: PasswordAudit.zip could not be found." -ForegroundColor Yellow
+}
+
+Write-Host ""
+Write-Host "  =================================================" -ForegroundColor DarkYellow
+Write-Host "  [!] REMINDER                                     " -ForegroundColor Yellow
+Write-Host "  =================================================" -ForegroundColor DarkYellow
+Write-Host ""
+Write-Host "  Before exiting, ensure the output files have been" -ForegroundColor White
+Write-Host "  copied from the server to SharePoint."            -ForegroundColor White
+Write-Host ""
+Write-Host "  =================================================" -ForegroundColor DarkYellow
+Write-Host ""
+
+Read-Host "  Press Enter to exit"
